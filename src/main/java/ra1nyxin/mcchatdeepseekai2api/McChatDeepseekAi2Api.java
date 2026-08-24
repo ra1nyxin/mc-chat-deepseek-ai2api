@@ -45,7 +45,10 @@ public final class McChatDeepseekAi2Api extends JavaPlugin implements Listener, 
     private final Object queueLock = new Object();
     private final ArrayDeque<AiRequest> requestQueue = new ArrayDeque<>();
     private final ArrayDeque<String> sharedHistory = new ArrayDeque<>();
-    private final HttpClient httpClient = HttpClient.newBuilder().build();
+    // The local AI2API endpoint closes HTTP/2 upgrade attempts, so keep this OpenAI-compatible call on HTTP/1.1.
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .build();
     private volatile PluginSettings settings;
     private volatile boolean workerRunning;
     private volatile int pendingRequestCount;
@@ -162,9 +165,7 @@ public final class McChatDeepseekAi2Api extends JavaPlugin implements Listener, 
             pendingRequestCount++;
             queueLock.notifyAll();
         }
-        if (queuePosition == 0) {
-            notifyPlayer(playerId, "[AI] 请求已提交，正在等待 DeepSeek 回复。");
-        } else {
+        if (queuePosition > 0) {
             notifyPlayer(playerId, "[AI] 请求已加入队列，前方还有 " + queuePosition + " 个请求。");
         }
     }
