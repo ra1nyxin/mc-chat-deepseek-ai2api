@@ -12,6 +12,30 @@
 - 回复会先转为 Minecraft 可读的纯文本，再从第一行开始每秒发送一行；同一时间只播报一段 AI 回复，避免多位玩家的回答交错。
 - 管理员可执行 `/mc-chat-deepseek-ai2api reload` 安全重载配置；配置不合法时保留当前生效配置。
 
+## 通信流程
+
+```mermaid
+flowchart TB
+    Player[玩家] -->|普通聊天或 ai问题| ChatEvent[Paper AsyncChatEvent]
+    ChatEvent -->|原始消息照常广播| GameChat[游戏聊天栏]
+
+    subgraph Paper[Paper 26.2 服务端]
+        ChatEvent -->|写入| History[(共享上下文<br/>最近最多 500 条)]
+        ChatEvent -->|识别 ai 前缀并取出问题| Queue[单消费者队列<br/>最多 256 个请求]
+        Queue --> Worker[虚拟线程 Worker]
+        History -->|系统提示、历史和当前问题| Worker
+        Worker -->|最终回复| MainThread[Paper 主线程调度器]
+        MainThread -->|转换纯文本后<br/>首行立即、后续每秒一行| GameChat
+    end
+
+    Worker -->|HTTP/1.1 POST<br/>OpenAI Chat Completions| AI2API[本机 AI2API<br/>127.0.0.1:3000]
+    AI2API -->|模型调用与联网搜索| DeepSeek[DeepSeek 模型]
+    DeepSeek -->|回答| AI2API
+    AI2API -->|JSON 响应| Worker
+```
+
+玩家的原始 `ai...` 消息不会被插件隐藏。队列一次只执行一条请求，并等待当前回答全部逐行发完后才开始下一条，因此共享上下文与聊天输出不会被并发回答打乱。
+
 ## 环境与兼容性
 
 本项目按 Paper `26.2.build.87-stable` 和 Java 25 编译，使用 Paper 的 `AsyncChatEvent` 监听聊天，因此目标环境为 Paper 26.2 或提供该事件的兼容实现。它不以 Spigot 为目标，也不保证旧版 Paper、Spigot 或 Purpur 可直接运行。
