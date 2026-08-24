@@ -21,6 +21,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.File;
 import java.io.IOException;
@@ -272,10 +273,7 @@ public final class McChatDeepseekAi2Api extends JavaPlugin implements Listener, 
             return;
         }
         String reply = limitCodePoints(renderForMinecraftChat(visibleReply), request.settings().maxResponseCharacters());
-        runOnMainThread(() -> {
-            appendHistory("<" + request.settings().aiName() + "> " + reply);
-            broadcastReply(request.settings(), reply);
-        });
+        publishReplyGradually(request.settings(), reply);
     }
 
     private String buildConversation(PluginSettings requestSettings, String rawQuestion) {
@@ -316,12 +314,50 @@ public final class McChatDeepseekAi2Api extends JavaPlugin implements Listener, 
         return conversation.toString();
     }
 
-    private void broadcastReply(PluginSettings requestSettings, String reply) {
+    private void publishReplyGradually(PluginSettings requestSettings, String reply) throws InterruptedException {
+        CompletableFuture<Void> displayed = new CompletableFuture<>();
+        runOnMainThread(() -> {
+            appendHistory("<" + requestSettings.aiName() + "> " + reply);
+            broadcastReplyGradually(requestSettings, reply, displayed);
+        });
+        try {
+            displayed.get();
+        } catch (java.util.concurrent.ExecutionException exception) {
+            getLogger().log(Level.WARNING, "逐行发送 AI 回复时失败", exception.getCause());
+        }
+    }
+
+    private void broadcastReplyGradually(
+            PluginSettings requestSettings, String reply, CompletableFuture<Void> displayed) {
         String prefix = "<" + requestSettings.aiName() + "> ";
         int availableCharacters = Math.max(1, requestSettings.maxChatLineCharacters() - codePointCount(prefix));
-        for (String line : splitForChat(reply, availableCharacters)) {
-            Bukkit.broadcast(Component.text(prefix + line));
+        List<String> lines = splitForChat(reply, availableCharacters);
+        if (lines.isEmpty()) {
+            displayed.complete(null);
+            return;
         }
+        new BukkitRunnable() {
+            private int nextLine;
+
+            @Override
+            public void run() {
+                try {
+                    if (!McChatDeepseekAi2Api.this.isEnabled()) {
+                        displayed.complete(null);
+                        cancel();
+                        return;
+                    }
+                    Bukkit.broadcast(Component.text(prefix + lines.get(nextLine++)));
+                    if (nextLine >= lines.size()) {
+                        displayed.complete(null);
+                        cancel();
+                    }
+                } catch (Throwable throwable) {
+                    displayed.completeExceptionally(throwable);
+                    cancel();
+                }
+            }
+        }.runTaskTimer(this, 0L, 20L);
     }
 
     private void appendHistory(String entry) {
