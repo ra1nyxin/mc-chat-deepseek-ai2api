@@ -37,10 +37,18 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class McChatDeepseekAi2Api extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
     private static final PlainTextComponentSerializer PLAIN_TEXT = PlainTextComponentSerializer.plainText();
     private static final int MAX_STORED_HISTORY_CHARACTERS = 32_768;
+    private static final Pattern MARKDOWN_HEADING = Pattern.compile("^\\s{0,3}#{1,6}\\s+");
+    private static final Pattern MARKDOWN_BULLET = Pattern.compile("^(\\s*)[*+-]\\s+");
+    private static final Pattern MARKDOWN_QUOTE = Pattern.compile("^\\s*>\\s?");
+    private static final Pattern MARKDOWN_RULE = Pattern.compile("^\\s{0,3}([-*_])(?:\\s*\\1){2,}\\s*$");
+    private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[([^]]*)]\\(([^\\s)]+)(?:\\s+[^)]*)?\\)");
+    private static final Pattern MARKDOWN_LINK = Pattern.compile("(?<!!)\\[([^]]+)]\\(([^\\s)]+)(?:\\s+[^)]*)?\\)");
 
     private final Object queueLock = new Object();
     private final ArrayDeque<AiRequest> requestQueue = new ArrayDeque<>();
@@ -263,7 +271,7 @@ public final class McChatDeepseekAi2Api extends JavaPlugin implements Listener, 
             runOnMainThread(() -> notifyPlayer(request.playerId(), "[AI] 模型没有返回可显示的回答。"));
             return;
         }
-        String reply = limitCodePoints(visibleReply, request.settings().maxResponseCharacters());
+        String reply = limitCodePoints(renderForMinecraftChat(visibleReply), request.settings().maxResponseCharacters());
         runOnMainThread(() -> {
             appendHistory("<" + request.settings().aiName() + "> " + reply);
             broadcastReply(request.settings(), reply);
@@ -444,9 +452,8 @@ public final class McChatDeepseekAi2Api extends JavaPlugin implements Listener, 
     private static List<String> splitForChat(String text, int maximumCodePoints) {
         List<String> lines = new ArrayList<>();
         for (String paragraph : text.replace('\r', '\n').split("\\n", -1)) {
-            String remaining = paragraph;
+            String remaining = paragraph.strip();
             if (remaining.isEmpty()) {
-                lines.add(" ");
                 continue;
             }
             while (codePointCount(remaining) > maximumCodePoints) {
@@ -463,6 +470,41 @@ public final class McChatDeepseekAi2Api extends JavaPlugin implements Listener, 
             }
         }
         return lines;
+    }
+
+    private static String renderForMinecraftChat(String markdown) {
+        StringBuilder rendered = new StringBuilder(markdown.length());
+        boolean inCodeBlock = false;
+        for (String rawLine : markdown.replace("\r\n", "\n").replace('\r', '\n').split("\\n", -1)) {
+            String line = rawLine;
+            if (line.stripLeading().startsWith("```")) {
+                inCodeBlock = !inCodeBlock;
+                continue;
+            }
+            if (!inCodeBlock) {
+                line = MARKDOWN_HEADING.matcher(line).replaceFirst("");
+                line = MARKDOWN_QUOTE.matcher(line).replaceFirst("");
+                line = MARKDOWN_BULLET.matcher(line).replaceFirst("$1- ");
+                if (MARKDOWN_RULE.matcher(line).matches()) {
+                    continue;
+                }
+                line = replaceMarkdownLinks(line, MARKDOWN_IMAGE, "$1 ($2)");
+                line = replaceMarkdownLinks(line, MARKDOWN_LINK, "$1 ($2)");
+                line = line.replace("**", "").replace("__", "").replace("~~", "").replace("`", "");
+            }
+            if (!line.isBlank()) {
+                if (!rendered.isEmpty()) {
+                    rendered.append('\n');
+                }
+                rendered.append(line.strip());
+            }
+        }
+        return rendered.toString();
+    }
+
+    private static String replaceMarkdownLinks(String input, Pattern pattern, String replacement) {
+        Matcher matcher = pattern.matcher(input);
+        return matcher.replaceAll(replacement);
     }
 
     private static String limitCodePoints(String text, int maximumCodePoints) {
