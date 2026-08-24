@@ -108,10 +108,12 @@ public final class McChatDeepseekAi2Api extends JavaPlugin implements Listener, 
             if (question.isEmpty()) {
                 return;
             }
-            event.setCancelled(true);
             UUID playerId = player.getUniqueId();
             String playerName = player.getName();
-            getServer().getScheduler().runTask(this, () -> submitAiRequest(playerId, playerName, question));
+            getServer().getScheduler().runTask(this, () -> {
+                appendHistory("<" + playerName + "> " + message);
+                submitAiRequest(playerId, question);
+            });
             return;
         }
 
@@ -142,9 +144,8 @@ public final class McChatDeepseekAi2Api extends JavaPlugin implements Listener, 
         }
     }
 
-    private void submitAiRequest(UUID playerId, String playerName, String question) {
+    private void submitAiRequest(UUID playerId, String question) {
         PluginSettings requestSettings = settings;
-        appendHistory("<" + playerName + "> " + question);
         if (!requestSettings.hasApiKey()) {
             notifyPlayer(playerId, "[AI] 管理员尚未在插件配置中填写 API 密钥。");
             return;
