@@ -1,0 +1,14 @@
+name: mc-chat-deepseek-ai2api
+version: 1.0.0
+main: ra1nyxin.mcchatdeepseekai2api.McChatDeepseekAi2Api
+author: ra1nyxin
+api-version: '26.2'
+description: Shared in-game chat access to a DeepSeek-compatible AI2API endpoint.
+commands:
+  mc-chat-deepseek-ai2api:
+    description: Reloads the mc-chat-deepseek-ai2api configuration.
+    usage: /mc-chat-deepseek-ai2api reload
+permissions:
+  mc-chat-deepseek-ai2api.admin:
+    description: Allows reloading the mc-chat-deepseek-ai2api configuration.
+    default: op

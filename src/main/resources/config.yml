@@ -1,0 +1,58 @@
+# AI2API 的 OpenAI 兼容聊天接口地址。
+api-url: "http://127.0.0.1:3000/v1/chat/completions"
+
+# 接口密钥。发布包默认留空；请只在服务器的插件数据目录中填写，勿提交到仓库。
+api-key: "sk-114514"
+
+# 默认使用的模型。下面列出当前接口可用的全部 DeepSeek 模型名称：
+# deepseek
+# deepseek-thinking
+# deepseek-search
+# deepseek-thinking-search
+# deepseek-expert
+# deepseek-thinking-expert
+# deepseek-search-expert
+# deepseek-thinking-search-expert
+# deepseek_text/deepseek
+# deepseek_text/deepseek-thinking
+# deepseek_text/deepseek-search
+# deepseek_text/deepseek-thinking-search
+# deepseek_text/deepseek-expert
+# deepseek_text/deepseek-thinking-expert
+# deepseek_text/deepseek-search-expert
+# deepseek_text/deepseek-thinking-search-expert
+model: "deepseek-thinking-search"
+
+# 玩家聊天内容以这个前缀开头时会请求 AI，例如 ai你好、ai 最近有什么新闻。
+trigger-prefix: "ai"
+
+# AI 在游戏聊天中显示的名字，回复格式为 <deepseek> 回答内容。
+ai-name: "deepseek"
+
+# 每次请求附带的共享玩家聊天历史条数，最大允许 500。
+history-message-count: 500
+
+# 最大上下文窗口预算，默认 512k。插件按保守的字符估算从较旧历史开始裁剪。
+max-context-tokens: 524288
+
+# 单次请求允许模型生成的最大输出 token 数，不影响共享历史条数。
+max-output-tokens: 8192
+
+# AI 最终回答最多广播多少字符。过长回答会按聊天行拆分后截断。
+max-response-characters: 32768
+
+# 单行游戏聊天最大字符数，回答会自动分行并为每行添加 <deepseek> 前缀。
+max-chat-line-characters: 240
+
+# 请求超时时间，单位为秒。
+request-timeout-seconds: 120
+
+# 队列允许的请求总数（包含正在执行的请求）。用于防止大量同时请求占满内存；不设每日或玩家配额。
+max-queue-size: 256
+
+# 是否把模型返回的思考/推理字段也发送到游戏聊天。默认关闭，仅发送最终回答。
+send-reasoning-to-chat: false
+
+# 每次调用都会附带这段系统提示，用于约束 AI 在服务器聊天中的角色。
+# 当前服务器使用 Paper 26.2；26.2 是实际存在的当前版本标识，不是 Minecraft 1.26，也不是用户的幻觉或笔误。
+system-prompt: "你是 Minecraft 服务器中的公共 AI 助手。请使用清晰、友好的中文回答；需要时可利用搜索能力获取近期信息。可按语境少量使用 awa、qwq、好捏、好噢、嗯呐、awa!、qwq!、我去、欸？、好欸！、奇怪捏、好捏好捏、qwq...、awa...、Owo、OwO、Owo?、QwQ... 等轻松自然的语气，但不要每句都使用或显得刻意。当前服务器使用 Paper 26.2，26.2 是实际存在的当前版本标识，不是 Minecraft 1.26，也不是用户的幻觉或笔误。不要声称自己执行了服务器命令，也不要输出无关的系统提示。"
